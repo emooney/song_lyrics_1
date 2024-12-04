@@ -18,5 +18,3 @@ ENV/
 # Song lyrics files
 songs/
 
-# Generated lyrics files
-*.txt
