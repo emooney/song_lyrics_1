@@ -222,38 +222,22 @@
     </header>
 
     <main class="main-content">
-        <div class="lyrics-form-container">
-            <div class="card">
-                <div class="card-body">
-                    <form id="lyricsForm">
-                        <div class="mb-3">
-                            <label for="songs" class="form-label">Enter Songs</label>
-                            <textarea class="form-control" id="songs" rows="5" 
-                                placeholder="Song Name | Artist (Artist is optional)&#10;Example:&#10;Bohemian Rhapsody | Queen&#10;Yesterday | The Beatles&#10;Imagine" style="height: 2rem; font-size: 1.1rem;"></textarea>
-                        </div>
-                        <button type="submit" class="btn btn-primary w-100">Find Lyrics</button>
-                        <div id="results" class="results-container"></div>
-                    </form>
+        <div class="card lyrics-form-container">
+            <div class="card-body">
+                <div class="mb-3">
+                    <label for="songInput" class="form-label">Enter song name (optionally add artist with | separator)</label>
+                    <input type="text" class="form-control" id="songInput" placeholder="Enter song name or 'song name | artist'" oninput="filterSongs(this.value)" autofocus>
                 </div>
+                <button class="btn btn-primary" onclick="handleSongInput()">Search / Download</button>
             </div>
         </div>
 
-        <div class="songs-container">
-            <div class="card">
-                <div class="card-body">
-                    <h5 class="card-title mb-3">Song Filter</h5>
-                    <div class="mb-3">
-                        <input type="text" class="form-control" id="songSearch" placeholder="Filter songs...">
-                    </div>
-                    <div id="songList" class="list-group">
-                        <!-- Songs will be populated here -->
-                    </div>
-                </div>
-            </div>
+        <div id="songsList" class="songs-container">
+            <!-- Songs will be rendered here -->
         </div>
     </main>
 
-    <div id="lyricsView" class="lyrics-view">
+    <div class="lyrics-view" id="lyricsView">
         <button class="btn btn-outline-secondary back-button" onclick="showMainView()">
             <i class="bi bi-arrow-left"></i> Back to Songs
         </button>
@@ -302,173 +286,152 @@
             // Show main view by default
             showMainView();
 
-            // Load available songs
-            fetch('/list-songs')
-                .then(response => response.json())
-                .then(songs => {
-                    const songList = document.getElementById('songList');
-                    const renderSongs = (filteredSongs) => {
-                        songList.innerHTML = '';
-                        if (filteredSongs.length === 0) {
-                            songList.innerHTML = '<p class="text-muted p-3">No songs found matching your filter.</p>';
-                            return;
-                        }
-                        filteredSongs.forEach(song => {
-                            const button = document.createElement('button');
-                            button.className = 'list-group-item list-group-item-action';
-                            button.innerHTML = `
-                                <div class="d-flex w-100 justify-content-between align-items-center">
-                                    <div>
-                                        <div class="song-title">${song.title}</div>
-                                        ${song.artist ? `<div class="song-artist">${song.artist}</div>` : ''}
-                                    </div>
-                                    <div class="d-flex align-items-center">
-                                        <button class="btn btn-link text-danger delete-btn me-2" 
-                                                title="Delete song"
-                                                onclick="event.stopPropagation();">
-                                            <i class="bi bi-trash"></i>
-                                        </button>
-                                        <i class="bi bi-chevron-right"></i>
-                                    </div>
-                                </div>
-                            `;
-                            
-                            // Add click handler for viewing lyrics
-                            button.onclick = () => {
-                                fetch(`/get-lyrics/${encodeURIComponent(song.filename)}`)
-                                    .then(response => response.json())
-                                    .then(data => {
-                                        if (data.error) {
-                                            alert('Error loading lyrics: ' + data.error);
-                                            return;
-                                        }
-                                        const title = data.artist ? 
-                                            `${data.title} - ${data.artist}` : 
-                                            data.title;
-                                        document.getElementById('songTitle').textContent = title;
-                                        document.getElementById('songLyrics').textContent = data.lyrics;
-                                        showLyricsView();
-                                    })
-                                    .catch(error => {
-                                        alert('Error loading lyrics: ' + error);
-                                    });
-                            };
-
-                            // Add click handler for delete button
-                            button.querySelector('.delete-btn').onclick = (e) => {
-                                e.stopPropagation();
-                                if (confirm(`Are you sure you want to delete "${song.title}"?`)) {
-                                    fetch(`/delete-song/${encodeURIComponent(song.filename)}`, {
-                                        method: 'DELETE'
-                                    })
-                                    .then(response => response.json())
-                                    .then(data => {
-                                        if (data.error) {
-                                            alert('Error deleting song: ' + data.error);
-                                            return;
-                                        }
-                                        // Remove the song from the songs array and re-render
-                                        const index = songs.findIndex(s => s.filename === song.filename);
-                                        if (index > -1) {
-                                            songs.splice(index, 1);
-                                            // Re-filter and render the updated list
-                                            const filterTerm = document.getElementById('songSearch').value.toLowerCase().trim();
-                                            const filteredSongs = filterTerm === '' ? songs : songs.filter(s => {
-                                                const titleMatch = s.title.toLowerCase().includes(filterTerm);
-                                                const artistMatch = s.artist && s.artist.toLowerCase().includes(filterTerm);
-                                                return titleMatch || artistMatch;
-                                            });
-                                            renderSongs(filteredSongs);
-                                        }
-                                    })
-                                    .catch(error => {
-                                        alert('Error deleting song: ' + error);
-                                    });
-                                }
-                            };
-                            
-                            songList.appendChild(button);
-                        });
-                    };
-
-                    // Initial render with all songs
-                    renderSongs(songs);
-
-                    // Filter functionality
-                    const searchInput = document.getElementById('songSearch');
-                    searchInput.addEventListener('input', (e) => {
-                        const filterTerm = e.target.value.toLowerCase().trim();
-                        const filteredSongs = filterTerm === '' ? songs : songs.filter(song => {
-                            const titleMatch = song.title.toLowerCase().includes(filterTerm);
-                            const artistMatch = song.artist && song.artist.toLowerCase().includes(filterTerm);
-                            return titleMatch || artistMatch;
-                        });
-                        renderSongs(filteredSongs);
-                    });
-                })
-                .catch(error => {
-                    console.error('Error loading songs:', error);
-                    document.getElementById('songList').innerHTML = 
-                        '<div class="alert alert-danger">Error loading songs. Please refresh the page.</div>';
-                });
+            // Initial load of songs
+            fetchSongs();
+            
+            // Ensure input has focus
+            document.getElementById('songInput').focus();
         });
 
-        // Form submission for finding new lyrics
-        document.getElementById('lyricsForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const songs = document.getElementById('songs').value;
-            const resultsDiv = document.getElementById('results');
+        async function handleSongInput() {
+            const input = document.getElementById('songInput').value.trim();
+            if (!input) return;
+
+            const response = await fetch('/process_song', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ input: input })
+            });
+
+            const result = await response.json();
             
-            resultsDiv.innerHTML = '<div class="alert alert-info">Searching for lyrics...</div>';
+            if (result.status === 'success') {
+                // Refresh the songs list
+                fetchSongs();
+                // Show the lyrics if available
+                if (result.lyrics) {
+                    displayLyrics(result.filename, result.title, result.artist, result.lyrics);
+                }
+            } else {
+                alert(result.message);
+            }
+        }
+
+        async function fetchSongs() {
+            const response = await fetch('/list_songs');
+            const data = await response.json();
+            songs = data.songs;
+            renderSongs(songs);
+        }
+
+        function filterSongs(query) {
+            query = query.toLowerCase().trim();
             
-            try {
-                const response = await fetch('/search', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ songs }),
-                });
+            // If query contains artist separator, split it
+            let songQuery = query;
+            let artistQuery = '';
+            if (query.includes('|')) {
+                [songQuery, artistQuery] = query.split('|').map(part => part.trim());
+            }
+            
+            const filteredSongs = songs.filter(song => {
+                const titleMatch = song.title.toLowerCase().includes(songQuery);
+                const artistMatch = song.artist && song.artist.toLowerCase().includes(artistQuery);
                 
-                const results = await response.json();
-                
-                resultsDiv.innerHTML = results.map(result => {
-                    let statusClass = '';
-                    let message = '';
-                    
-                    switch(result.status) {
-                        case 'success':
-                            statusClass = 'success';
-                            message = `Lyrics saved successfully`;
-                            break;
-                        case 'error':
-                            statusClass = 'error';
-                            message = `Error: ${result.message}`;
-                            break;
-                        case 'not_found':
-                            statusClass = 'not-found';
-                            message = 'Lyrics not found';
-                            break;
-                    }
-                    
-                    return `
-                        <div class="result-item ${statusClass}">
-                            <strong>${result.song}</strong>
-                            ${result.artist ? ` by ${result.artist}` : ''}
-                            <br>
-                            ${message}
+                if (artistQuery) {
+                    // If artist is specified, both title and artist should match
+                    return titleMatch && artistMatch;
+                } else {
+                    // If no artist specified, match either title or artist
+                    return titleMatch || (song.artist && song.artist.toLowerCase().includes(songQuery));
+                }
+            });
+            
+            renderSongs(filteredSongs);
+        }
+
+        function renderSongs(songs) {
+            const songList = document.getElementById('songsList');
+            songList.innerHTML = '';
+            songs.forEach(song => {
+                const button = document.createElement('button');
+                button.className = 'list-group-item list-group-item-action';
+                button.innerHTML = `
+                    <div class="d-flex w-100 justify-content-between align-items-center">
+                        <div>
+                            <div class="song-title">${song.title}</div>
+                            ${song.artist ? `<div class="song-artist">${song.artist}</div>` : ''}
                         </div>
-                    `;
-                }).join('');
-                
-            } catch (error) {
-                resultsDiv.innerHTML = `
-                    <div class="alert alert-danger">
-                        An error occurred while searching for lyrics: ${error.message}
+                        <div class="d-flex align-items-center">
+                            <button class="btn btn-link text-danger delete-btn me-2" 
+                                    title="Delete song"
+                                    onclick="event.stopPropagation();">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                            <i class="bi bi-chevron-right"></i>
+                        </div>
                     </div>
                 `;
-            }
-        });
+                
+                // Add click handler for viewing lyrics
+                button.onclick = () => {
+                    fetch(`/get-lyrics/${encodeURIComponent(song.filename)}`)
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.error) {
+                                alert('Error loading lyrics: ' + data.error);
+                                return;
+                            }
+                            const title = data.artist ? 
+                                `${data.title} - ${data.artist}` : 
+                                data.title;
+                            document.getElementById('songTitle').textContent = title;
+                            document.getElementById('songLyrics').textContent = data.lyrics;
+                            showLyricsView();
+                        })
+                        .catch(error => {
+                            alert('Error loading lyrics: ' + error);
+                        });
+                };
+
+                // Add click handler for delete button
+                button.querySelector('.delete-btn').onclick = (e) => {
+                    e.stopPropagation();
+                    if (confirm(`Are you sure you want to delete "${song.title}"?`)) {
+                        fetch(`/delete-song/${encodeURIComponent(song.filename)}`, {
+                            method: 'DELETE'
+                        })
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.error) {
+                                alert('Error deleting song: ' + data.error);
+                                return;
+                            }
+                            // Remove the song from the songs array and re-render
+                            const index = songs.findIndex(s => s.filename === song.filename);
+                            if (index > -1) {
+                                songs.splice(index, 1);
+                                // Re-render the updated list
+                                renderSongs(songs);
+                            }
+                        })
+                        .catch(error => {
+                            alert('Error deleting song: ' + error);
+                        });
+                    }
+                };
+                
+                songList.appendChild(button);
+            });
+        }
+
+        function displayLyrics(filename, title, artist, lyrics) {
+            document.getElementById('songTitle').textContent = artist ? `${title} - ${artist}` : title;
+            document.getElementById('songLyrics').textContent = lyrics;
+            showLyricsView();
+        }
     </script>
 </body>
 </html>
