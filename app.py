@@ -1,6 +1,7 @@
 from flask import Flask, render_template, request, jsonify
 import lyricsgenius
 import os
+import re
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
@@ -19,12 +20,81 @@ genius = lyricsgenius.Genius(GENIUS_TOKEN)
 SONGS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'songs')
 os.makedirs(SONGS_DIR, exist_ok=True)
 
+def clean_lyrics(lyrics):
+    # Split lyrics into lines
+    lines = lyrics.split('\n')
+    
+    # Process the lines with proper spacing
+    cleaned_lines = []
+    
+    for i, line in enumerate(lines):
+        current_line = line.strip()
+        
+        # Skip empty lines at the start of the file
+        if not current_line and not cleaned_lines:
+            continue
+            
+        # Handle Title and Artist lines
+        if current_line.startswith('Title:') or current_line.startswith('Artist:'):
+            cleaned_lines.append(current_line)
+            if not (i + 1 < len(lines) and lines[i + 1].strip() == ''):
+                cleaned_lines.append('')
+            continue
+            
+        # Skip unwanted lines
+        if (current_line.lower().endswith('lyrics') or 
+            'you might also like' in current_line.lower() or
+            re.match(r'.*\d+\s*[Ee]mbed\s*$', current_line)):
+            continue
+            
+        # Handle section markers
+        if current_line.startswith('['):
+            # Skip duplicate section markers
+            if (cleaned_lines and 
+                (cleaned_lines[-1].startswith('[') or 
+                 (len(cleaned_lines) > 1 and cleaned_lines[-2].startswith('[')))):
+                continue
+                
+            # Add empty line before section marker if needed
+            if cleaned_lines and cleaned_lines[-1].strip():
+                cleaned_lines.append('')
+            cleaned_lines.append(current_line)
+            
+            # Add empty line after section marker if next line isn't empty
+            if i + 1 < len(lines) and lines[i + 1].strip():
+                cleaned_lines.append('')
+            continue
+            
+        # Handle regular content lines
+        if current_line:
+            cleaned_lines.append(current_line)
+        # Handle empty lines
+        elif cleaned_lines and cleaned_lines[-1].strip():
+            cleaned_lines.append('')
+    
+    # Clean up multiple consecutive empty lines
+    final_lines = []
+    prev_empty = False
+    for line in cleaned_lines:
+        if line.strip() or not prev_empty:
+            final_lines.append(line)
+            prev_empty = not line.strip()
+    
+    # Ensure the file ends with a newline
+    if final_lines and final_lines[-1].strip():
+        final_lines.append('')
+    
+    return '\n'.join(final_lines)
+
 def save_lyrics(song_name, lyrics, artist=None):
+    # Clean the lyrics first
+    cleaned_lyrics = clean_lyrics(lyrics)
+    
     # Create metadata string
     metadata = f"Title: {song_name}\n"
     if artist:
         metadata += f"Artist: {artist}\n"
-    metadata += f"\n{lyrics}"
+    metadata += f"\n{cleaned_lyrics}"
     
     # Create a valid filename from the song name and artist
     base_name = song_name
@@ -136,7 +206,8 @@ def view_lyrics():
     
     return jsonify(results)
 
-@app.route('/list-songs')
+# This method is triggered when the user first opens the page in the browser.
+@app.route('/list-songs', methods=['GET'])
 def list_songs():
     songs = []
     for filename in os.listdir(SONGS_DIR):
@@ -177,6 +248,18 @@ def get_lyrics_by_file(filename):
             'artist': artist,
             'lyrics': lyrics
         })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/delete-song/<filename>', methods=['DELETE'])
+def delete_song(filename):
+    try:
+        file_path = os.path.join(SONGS_DIR, filename)
+        if not os.path.exists(file_path):
+            return jsonify({'error': 'Song file not found'}), 404
+        
+        os.remove(file_path)
+        return jsonify({'message': 'Song deleted successfully'})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 

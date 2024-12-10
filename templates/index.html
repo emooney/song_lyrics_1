@@ -241,9 +241,9 @@
         <div class="songs-container">
             <div class="card">
                 <div class="card-body">
-                    <h5 class="card-title mb-3">Songs</h5>
+                    <h5 class="card-title mb-3">Song Filter</h5>
                     <div class="mb-3">
-                        <input type="text" class="form-control" id="songSearch" placeholder="Search songs...">
+                        <input type="text" class="form-control" id="songSearch" placeholder="Filter songs...">
                     </div>
                     <div id="songList" class="list-group">
                         <!-- Songs will be populated here -->
@@ -307,14 +307,10 @@
                 .then(response => response.json())
                 .then(songs => {
                     const songList = document.getElementById('songList');
-                    const renderSongs = (filteredSongs, searchTerm) => {
+                    const renderSongs = (filteredSongs) => {
                         songList.innerHTML = '';
-                        if (!searchTerm) {
-                            songList.innerHTML = '<p class="text-muted p-3">Enter text in the search box above to find saved songs...</p>';
-                            return;
-                        }
                         if (filteredSongs.length === 0) {
-                            songList.innerHTML = '<p class="text-muted p-3">No songs found matching your search.</p>';
+                            songList.innerHTML = '<p class="text-muted p-3">No songs found matching your filter.</p>';
                             return;
                         }
                         filteredSongs.forEach(song => {
@@ -326,9 +322,18 @@
                                         <div class="song-title">${song.title}</div>
                                         ${song.artist ? `<div class="song-artist">${song.artist}</div>` : ''}
                                     </div>
-                                    <i class="bi bi-chevron-right"></i>
+                                    <div class="d-flex align-items-center">
+                                        <button class="btn btn-link text-danger delete-btn me-2" 
+                                                title="Delete song"
+                                                onclick="event.stopPropagation();">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                        <i class="bi bi-chevron-right"></i>
+                                    </div>
                                 </div>
                             `;
+                            
+                            // Add click handler for viewing lyrics
                             button.onclick = () => {
                                 fetch(`/get-lyrics/${encodeURIComponent(song.filename)}`)
                                     .then(response => response.json())
@@ -348,23 +353,57 @@
                                         alert('Error loading lyrics: ' + error);
                                     });
                             };
+
+                            // Add click handler for delete button
+                            button.querySelector('.delete-btn').onclick = (e) => {
+                                e.stopPropagation();
+                                if (confirm(`Are you sure you want to delete "${song.title}"?`)) {
+                                    fetch(`/delete-song/${encodeURIComponent(song.filename)}`, {
+                                        method: 'DELETE'
+                                    })
+                                    .then(response => response.json())
+                                    .then(data => {
+                                        if (data.error) {
+                                            alert('Error deleting song: ' + data.error);
+                                            return;
+                                        }
+                                        // Remove the song from the songs array and re-render
+                                        const index = songs.findIndex(s => s.filename === song.filename);
+                                        if (index > -1) {
+                                            songs.splice(index, 1);
+                                            // Re-filter and render the updated list
+                                            const filterTerm = document.getElementById('songSearch').value.toLowerCase().trim();
+                                            const filteredSongs = filterTerm === '' ? songs : songs.filter(s => {
+                                                const titleMatch = s.title.toLowerCase().includes(filterTerm);
+                                                const artistMatch = s.artist && s.artist.toLowerCase().includes(filterTerm);
+                                                return titleMatch || artistMatch;
+                                            });
+                                            renderSongs(filteredSongs);
+                                        }
+                                    })
+                                    .catch(error => {
+                                        alert('Error deleting song: ' + error);
+                                    });
+                                }
+                            };
+                            
                             songList.appendChild(button);
                         });
                     };
 
-                    // Initial render with empty search
-                    renderSongs([], '');
+                    // Initial render with all songs
+                    renderSongs(songs);
 
-                    // Search functionality
+                    // Filter functionality
                     const searchInput = document.getElementById('songSearch');
                     searchInput.addEventListener('input', (e) => {
-                        const searchTerm = e.target.value.toLowerCase().trim();
-                        const filteredSongs = searchTerm === '' ? [] : songs.filter(song => {
-                            const titleMatch = song.title.toLowerCase().includes(searchTerm);
-                            const artistMatch = song.artist && song.artist.toLowerCase().includes(searchTerm);
+                        const filterTerm = e.target.value.toLowerCase().trim();
+                        const filteredSongs = filterTerm === '' ? songs : songs.filter(song => {
+                            const titleMatch = song.title.toLowerCase().includes(filterTerm);
+                            const artistMatch = song.artist && song.artist.toLowerCase().includes(filterTerm);
                             return titleMatch || artistMatch;
                         });
-                        renderSongs(filteredSongs, searchTerm);
+                        renderSongs(filteredSongs);
                     });
                 })
                 .catch(error => {
