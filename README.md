@@ -29,14 +29,6 @@ python app.py
 
 2. Open your web browser and go to `http://localhost:5000`
 
-## Usage
-
-1. Enter songs in the text area, one per line
-2. Format: `Song Name | Artist` (Artist is optional)
-3. Click "Find Lyrics" to search and save the lyrics
-4. View saved lyrics by clicking on song titles in the list
-5. All lyrics are automatically saved in the `songs` directory
-
 Example input:
 ```
 Bohemian Rhapsody | Queen
@@ -45,12 +37,14 @@ Imagine
 ```
 
 ## Features
-
-- Search for lyrics by song name and artist
-- Support for multiple song searches at once
-- View saved lyrics directly in the web interface
-- List all previously saved songs
-- Automatic saving of lyrics to text files
+- All songs in the 'songs' directory are loaded automatically when the app starts.
+- Lyrics are fetched from Genius API when the songs are not found locally and the user hits'Search'.
+- Lyrics are saved in the 'songs' directory.
+- Dynamically filters songs being displayed based on the input text.
+- View lyrics when a song is selected.
+- Each song has a delete button to remove it from the list.
+- Lyrics are formatted with newlines and indentation.
 - Clean and responsive web interface
 - Secure configuration using environment variables
 - Error handling and status feedback
+- dark and light themes

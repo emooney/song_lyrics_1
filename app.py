@@ -1,231 +1,202 @@
-from flask import Flask, render_template, jsonify, request
+from flask import Flask, render_template, request, jsonify
 import os
 from dotenv import load_dotenv
 import lyricsgenius
-import re
 import json
+import re
+import logging
 
 # Load environment variables
 load_dotenv()
 
 app = Flask(__name__)
 
-# Initialize Genius client
-access_token = os.getenv('GENIUS_TOKEN')
-genius = lyricsgenius.Genius(
-    access_token,
-    retries=3,
-    verbose=True,  # Enable verbose logging
-    remove_section_headers=True,
-    timeout=15
-)
+# Initialize Genius API
+genius = lyricsgenius.Genius(os.getenv('GENIUS_TOKEN'))
 
-# Update session headers
-genius._session.headers.update({
-    'Authorization': f'Bearer {access_token}',
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-})
+# Ensure songs directory exists
+SONGS_DIR = 'songs'
+os.makedirs(SONGS_DIR, exist_ok=True)
 
-# Print current configuration
-print(f"Genius API Configuration:")
-print(f"Access Token: {access_token[:5]}...")
-print(f"Headers: {genius._session.headers}")
+# Set up logging
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
 
-def sanitize_filename(filename):
-    """Convert song title to valid filename"""
-    return re.sub(r'[^\w\s-]', '', filename).replace(' ', '_')
+def clean_filename(filename):
+    """Clean filename to be filesystem safe"""
+    # Remove any characters that aren't alphanumeric, space, hyphen, or underscore
+    cleaned = re.sub(r'[^\w\s-]', '', filename)
+    # Replace multiple spaces with a single space
+    cleaned = re.sub(r'\s+', ' ', cleaned)
+    # Trim spaces from beginning and end
+    cleaned = cleaned.strip()
+    return cleaned
 
-def get_songs():
-    """Get list of all songs in songs directory"""
-    if not os.path.exists('songs'):
-        os.makedirs('songs')
+def load_songs():
+    """Load all songs from the songs directory"""
     songs = []
-    for file in os.listdir('songs'):
-        if file.endswith('.txt'):
-            title = file[:-4].replace('_', ' ')
-            # Try to get artist from file content
-            filepath = os.path.join('songs', file)
-            artist = None
-            try:
-                with open(filepath, 'r', encoding='utf-8') as f:
-                    first_line = f.readline().strip()
-                    if 'by' in first_line.lower():
-                        artist = first_line.split('by')[-1].strip()
-            except:
-                pass
+    for filename in os.listdir(SONGS_DIR):
+        if filename.endswith('.txt'):
+            # Parse filename to get title and artist
+            name_parts = filename[:-4].split(' - ', 1)  # Remove .txt and split on first ' - '
+            title = name_parts[0]
+            artist = name_parts[1] if len(name_parts) > 1 else None
+            
+            # Read lyrics from file
+            with open(os.path.join(SONGS_DIR, filename), 'r', encoding='utf-8') as f:
+                lyrics = f.read()
+            
             songs.append({
                 'title': title,
                 'artist': artist,
-                'filename': file
+                'lyrics': lyrics
             })
-    return sorted(songs, key=lambda x: x['title'].lower())
+    return songs
 
-def save_lyrics(title, artist, lyrics):
-    """Save lyrics to file"""
-    if not os.path.exists('songs'):
-        os.makedirs('songs')
-    filename = f"{sanitize_filename(title)}.txt"
-    filepath = os.path.join('songs', filename)
+def save_song(title, artist, lyrics):
+    """Save song lyrics to a file"""
+    if artist:
+        filename = f"{clean_filename(title)} - {clean_filename(artist)}.txt"
+    else:
+        filename = f"{clean_filename(title)}.txt"
+    
+    filepath = os.path.join(SONGS_DIR, filename)
     with open(filepath, 'w', encoding='utf-8') as f:
-        if artist:
-            f.write(f"Lyrics by {artist}\n\n")
         f.write(lyrics)
     return filename
 
+def fetch_lyrics(title, artist=None):
+    """Fetch lyrics from Genius API"""
+    search_term = f"{title} {artist}" if artist else title
+    try:
+        if not os.getenv('GENIUS_TOKEN'):
+            logger.error("Error: GENIUS_TOKEN not found in environment variables")
+            return None
+            
+        song = genius.search_song(title, artist)
+        if song:
+            return song.lyrics
+        else:
+            logger.info(f"No song found for search term: {search_term}")
+    except Exception as e:
+        logger.error(f"Error fetching lyrics from Genius API: {str(e)}")
+        return None
+    return None
+
 @app.route('/')
 def index():
-    return render_template('index.html')
+    return render_template('index.html', songs=load_songs())
 
-@app.route('/list_songs')
-def list_songs():
-    return jsonify({'songs': get_songs()})
+@app.route('/search', methods=['POST'])
+def search():
+    logger.info("Received search request")
+    data = request.get_json()
+    input_text = data.get('text', '').strip()
+    is_search = data.get('isSearch', False)
+    
+    logger.info(f"Search request - Text: {input_text}, IsSearch: {is_search}")
+    
+    # Parse input (format: "title | artist" or just "title")
+    parts = [p.strip() for p in input_text.split('|', 1)]
+    title = parts[0]
+    artist = parts[1] if len(parts) > 1 else None
+    
+    logger.info(f"Parsed - Title: {title}, Artist: {artist}")
+    
+    # First check if we already have the lyrics
+    songs = load_songs()
+    logger.info(f"Loaded {len(songs)} songs")
+    
+    for song in songs:
+        logger.info(f"Comparing with song - Title: {song['title']}, Artist: {song['artist']}")
+        if song['title'].lower() == title.lower() and (not artist or (song['artist'] and song['artist'].lower() == artist.lower())):
+            logger.info("Found match! Returning lyrics")
+            return jsonify({'lyrics': song['lyrics']})
+    
+    logger.info("No local match found")
+    
+    # If not found locally, fetch from Genius only if this is a search request
+    if is_search:
+        logger.info("Attempting to fetch from Genius")
+        lyrics = fetch_lyrics(title, artist)
+        if lyrics:
+            logger.info("Found lyrics from Genius, saving")
+            save_song(title, artist, lyrics)
+            return jsonify({'lyrics': lyrics})
+    
+    logger.info("No lyrics found")
+    return jsonify({'error': 'Lyrics not found'}), 404
 
-@app.route('/get-lyrics/<filename>')
-def get_lyrics_by_filename(filename):
-    try:
-        filepath = os.path.join('songs', filename)
-        if not os.path.exists(filepath):
-            return jsonify({'error': 'Song not found'}), 404
-        
-        with open(filepath, 'r', encoding='utf-8') as f:
-            content = f.read()
-            # Try to extract artist from first line
-            lines = content.split('\n')
-            artist = None
-            lyrics = content
-            if lines[0].lower().startswith('lyrics by'):
-                artist = lines[0].split('by')[-1].strip()
-                lyrics = '\n'.join(lines[2:])  # Skip header and blank line
-            
-            return jsonify({
-                'title': filename[:-4].replace('_', ' '),
-                'artist': artist,
-                'lyrics': lyrics
-            })
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/process_song', methods=['POST'])
-def process_song():
+@app.route('/delete', methods=['POST'])
+def delete_song():
     try:
         data = request.get_json()
-        input_text = data.get('input', '').strip()
-        
-        # Split input into title and artist if separator exists
-        title = input_text
-        artist = None
-        if '|' in input_text:
-            parts = [p.strip() for p in input_text.split('|', 1)]
-            title = parts[0]
-            artist = parts[1] if len(parts) > 1 else None
-        
-        print(f"Searching for - Title: {title}, Artist: {artist}")  # Debug log
-        
-        # Check if song already exists
-        filename = f"{sanitize_filename(title)}.txt"
-        filepath = os.path.join('songs', filename)
-        
-        if os.path.exists(filepath):
-            with open(filepath, 'r', encoding='utf-8') as f:
-                content = f.read()
-                return jsonify({
-                    'status': 'success',
-                    'message': 'Song found in local storage',
-                    'filename': filename,
-                    'title': title,
-                    'artist': artist,
-                    'lyrics': content
-                })
-        
-        # Search using Genius API
-        try:
-            print(f"Calling Genius API with title='{title}', artist='{artist}'")  # Debug log
-            
-            # Try multiple search approaches
-            song = None
-            search_attempts = [
-                # Try exact search with artist
-                lambda: genius.search_song(title, artist) if artist else None,
-                # Try exact search without artist
-                lambda: genius.search_song(title),
-                # Try with 'by' between title and artist
-                lambda: genius.search_song(f"{title} by {artist}") if artist else None,
-                # Try with different artist formats
-                lambda: genius.search_song(title, artist.replace('The ', '')) if artist and artist.startswith('The ') else None,
-                lambda: genius.search_song(title, f"The {artist}") if artist and not artist.startswith('The ') else None,
-                # Try searching just by artist first
-                lambda: next((s for s in genius.search_artist(artist, max_songs=5).songs if s.title.lower() == title.lower()), None) if artist else None
-            ]
-            
-            for attempt in search_attempts:
-                try:
-                    print(f"Trying new search attempt...")  # Debug log
-                    result = attempt()
-                    if result:
-                        print(f"Found result: {result.title} by {result.artist}")  # Debug log
-                        song = result
-                        break
-                except Exception as search_error:
-                    print(f"Search attempt failed: {str(search_error)}")
-                    continue
-            
-            if song:
-                print(f"Song found: {song.title} by {song.artist}")  # Debug log
-                # Save lyrics
-                saved_filename = save_lyrics(title, artist or song.artist, song.lyrics)
-                return jsonify({
-                    'status': 'success',
-                    'message': 'Lyrics downloaded successfully',
-                    'filename': saved_filename,
-                    'title': title,
-                    'artist': artist or song.artist,
-                    'lyrics': song.lyrics
-                })
-            else:
-                print("No song found in Genius API")  # Debug log
-                return jsonify({
-                    'status': 'error',
-                    'message': 'Song not found on Genius'
-                }), 404
-                
-        except Exception as e:
-            error_msg = str(e)
-            print(f"Genius API Error: {error_msg}")  # Debug log
-            
-            if '403' in error_msg:
-                return jsonify({
-                    'status': 'error',
-                    'message': 'Authentication failed. Please check your Genius API token.'
-                }), 403
-            elif '429' in error_msg:
-                return jsonify({
-                    'status': 'error',
-                    'message': 'Rate limit exceeded. Please try again later.'
-                }), 429
-            else:
-                return jsonify({
-                    'status': 'error',
-                    'message': f'Error accessing Genius API: {error_msg}'
-                }), 500
-            
-    except Exception as e:
-        print(f"General Error: {str(e)}")  # Debug log
-        return jsonify({
-            'status': 'error',
-            'message': str(e)
-        }), 500
+        if not data:
+            return jsonify({'error': 'No data provided'}), 400
 
-@app.route('/delete-song/<filename>', methods=['DELETE'])
-def delete_song(filename):
-    try:
-        filepath = os.path.join('songs', filename)
-        if not os.path.exists(filepath):
-            return jsonify({'error': 'Song not found'}), 404
+        title = data.get('title')
+        if not title:
+            return jsonify({'error': 'Title is required'}), 400
+
+        artist = data.get('artist', '').strip()
         
-        os.remove(filepath)
-        return jsonify({'success': True})
+        # Create filename same way as save_song
+        if artist:
+            filename = f"{clean_filename(title)} - {clean_filename(artist)}.txt"
+        else:
+            filename = f"{clean_filename(title)}.txt"
+            
+        filepath = os.path.join(SONGS_DIR, filename)
+        
+        print(f"Attempting to delete: {filepath}")  # Debug log
+        
+        if not os.path.exists(filepath):
+            return jsonify({'error': f'Song file not found: {filename}'}), 404
+
+        try:
+            os.remove(filepath)
+            return jsonify({'success': True})
+        except PermissionError:
+            return jsonify({'error': 'Permission denied while deleting file'}), 403
+        except OSError as e:
+            return jsonify({'error': f'Failed to delete file: {str(e)}'}), 500
+            
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': f'Server error: {str(e)}'}), 500
+
+@app.route('/get_lyrics', methods=['POST'])
+def get_lyrics():
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': 'No data provided'}), 400
+
+        title = data.get('title')
+        if not title:
+            return jsonify({'error': 'Title is required'}), 400
+
+        artist = data.get('artist', '').strip()
+        
+        # Create filename same way as save_song
+        if artist:
+            filename = f"{clean_filename(title)} - {clean_filename(artist)}.txt"
+        else:
+            filename = f"{clean_filename(title)}.txt"
+            
+        filepath = os.path.join(SONGS_DIR, filename)
+        
+        if not os.path.exists(filepath):
+            return jsonify({'error': f'Lyrics file not found: {filename}'}), 404
+
+        try:
+            with open(filepath, 'r', encoding='utf-8') as f:
+                lyrics = f.read()
+            return jsonify({'success': True, 'lyrics': lyrics})
+        except Exception as e:
+            return jsonify({'error': f'Error reading lyrics: {str(e)}'}), 500
+            
+    except Exception as e:
+        return jsonify({'error': f'Server error: {str(e)}'}), 500
 
 if __name__ == '__main__':
     app.run(debug=True)

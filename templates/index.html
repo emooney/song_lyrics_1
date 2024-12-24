@@ -1,437 +1,68 @@
 <!DOCTYPE html>
-<html lang="en" data-bs-theme="light">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Song Lyrics Finder</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css">
-    <style>
-        :root {
-            --custom-bg: var(--bs-body-bg);
-            --custom-text: var(--bs-body-color);
-            --custom-border: var(--bs-border-color);
-            --custom-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            --header-height: 60px;
-        }
-
-        body {
-            background-color: var(--custom-bg);
-            color: var(--custom-text);
-            min-height: 100vh;
-            padding: 0;
-            margin: 0;
-        }
-
-        .app-header {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: var(--header-height);
-            background-color: var(--custom-bg);
-            border-bottom: 1px solid var(--custom-border);
-            display: flex;
-            align-items: center;
-            padding: 0 20px;
-            z-index: 1000;
-            box-shadow: var(--custom-shadow);
-        }
-
-        .app-title {
-            font-size: 1.5rem;
-            font-weight: 600;
-            margin: 0;
-            flex-grow: 1;
-        }
-
-        .theme-toggle {
-            background: none;
-            border: none;
-            font-size: 1.5rem;
-            padding: 10px;
-            cursor: pointer;
-            color: var(--custom-text);
-        }
-
-        .main-content {
-            margin-top: calc(var(--header-height) + 20px);
-            padding: 0 20px 20px;
-            max-width: 800px;
-            margin-left: auto;
-            margin-right: auto;
-        }
-
-        .card {
-            background-color: var(--custom-bg);
-            border: 1px solid var(--custom-border);
-            border-radius: 12px;
-            box-shadow: var(--custom-shadow);
-            margin-bottom: 1.5rem;
-        }
-
-        .lyrics-form-container {
-            margin-bottom: 2rem;
-        }
-
-        .songs-container {
-            margin-bottom: 2rem;
-        }
-
-        .card-body {
-            padding: 1.5rem;
-        }
-
-        .form-control {
-            background-color: var(--custom-bg);
-            border: 2px solid var(--custom-border);
-            border-radius: 8px;
-            padding: 12px;
-            font-size: 1.1rem;
-            color: var(--custom-text);
-            transition: all 0.3s ease;
-        }
-
-        .form-control:focus {
-            background-color: var(--custom-bg);
-            color: var(--custom-text);
-            box-shadow: 0 0 0 0.25rem rgba(var(--bs-primary-rgb), 0.25);
-        }
-
-        .btn {
-            padding: 12px 24px;
-            font-size: 1.1rem;
-            border-radius: 8px;
-            transition: all 0.3s ease;
-        }
-
-        .btn-primary {
-            box-shadow: var(--custom-shadow);
-        }
-
-        .list-group {
-            border-radius: 8px;
-            overflow: hidden;
-        }
-
-        .list-group-item {
-            background-color: var(--custom-bg);
-            border-color: var(--custom-border);
-            color: var(--custom-text);
-            padding: 1rem;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-
-        .list-group-item:hover {
-            background-color: var(--bs-secondary-bg);
-            transform: translateX(4px);
-        }
-
-        .song-title {
-            font-size: 1.1rem;
-            font-weight: 500;
-            margin: 0;
-        }
-
-        .song-artist {
-            font-size: 0.9rem;
-            color: var(--bs-secondary-color);
-        }
-
-        .results-container {
-            margin-top: 1rem;
-        }
-
-        .result-item {
-            padding: 1rem;
-            border-radius: 8px;
-            margin-bottom: 0.75rem;
-            transition: all 0.3s ease;
-        }
-
-        .success {
-            background-color: var(--bs-success-bg-subtle);
-            border: 1px solid var(--bs-success-border-subtle);
-            color: var(--bs-success-text);
-        }
-
-        .error {
-            background-color: var(--bs-danger-bg-subtle);
-            border: 1px solid var(--bs-danger-border-subtle);
-            color: var(--bs-danger-text);
-        }
-
-        .not-found {
-            background-color: var(--bs-warning-bg-subtle);
-            border: 1px solid var(--bs-warning-border-subtle);
-            color: var(--bs-warning-text);
-        }
-
-        .lyrics-view {
-            position: fixed;
-            top: var(--header-height);
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background-color: var(--custom-bg);
-            z-index: 900;
-            padding: 20px;
-            overflow-y: auto;
-            display: none;
-        }
-
-        .lyrics-text {
-            white-space: pre-wrap;
-            font-family: monospace;
-            font-size: 1.1rem;
-            line-height: 1.6;
-            padding: 1.5rem;
-            background-color: var(--custom-bg);
-            border-radius: 8px;
-            border: 1px solid var(--custom-border);
-            margin-top: 1rem;
-        }
-
-        .back-button {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-            font-size: 1.1rem;
-            margin-bottom: 1rem;
-        }
-
-        .back-button i {
-            font-size: 1.3rem;
-        }
-
-        @media (min-width: 992px) {
-            .main-content {
-                max-width: 800px;
-            }
-        }
-    </style>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-    <header class="app-header">
-        <h1 class="app-title">Song Lyrics Finder</h1>
-        <button class="theme-toggle" onclick="toggleTheme()">
-            <i class="bi bi-sun-fill" id="lightIcon"></i>
-            <i class="bi bi-moon-fill" id="darkIcon" style="display: none;"></i>
-        </button>
-    </header>
-
-    <main class="main-content">
-        <div class="card lyrics-form-container">
-            <div class="card-body">
-                <div class="mb-3">
-                    <label for="songInput" class="form-label">Enter song name (optionally add artist with | separator)</label>
-                    <input type="text" class="form-control" id="songInput" placeholder="Enter song name or 'song name | artist'" oninput="filterSongs(this.value)" autofocus>
+    <div class="container mt-4">
+        <div class="row">
+            <div class="col-md-12 text-center mb-4">
+                <h1>Song Lyrics Finder</h1>
+                <div class="theme-toggle mb-3">
+                    <button class="btn btn-sm btn-outline-secondary" id="themeToggle">Toggle Theme</button>
                 </div>
-                <button class="btn btn-primary" onclick="handleSongInput()">Search / Download</button>
             </div>
         </div>
-
-        <div id="songsList" class="songs-container">
-            <!-- Songs will be rendered here -->
-        </div>
-    </main>
-
-    <div class="lyrics-view" id="lyricsView">
-        <button class="btn btn-outline-secondary back-button" onclick="showMainView()">
-            <i class="bi bi-arrow-left"></i> Back to Songs
-        </button>
-        <div class="card">
-            <div class="card-body">
-                <h2 id="songTitle" class="mb-3"></h2>
-                <div id="songLyrics" class="lyrics-text"></div>
+        
+        <div class="row">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Search Songs</h5>
+                        <div class="form-group">
+                            <input type="text" id="searchInput" class="form-control" 
+                                   placeholder="Enter song title | artist (e.g., 'Yesterday | The Beatles')">
+                            <small class="form-text text-muted">Format: "Song Title | Artist" or just "Song Title"</small>
+                        </div>
+                        <button class="btn btn-primary mt-2" id="searchButton">Search</button>
+                        
+                        <div class="mt-4">
+                            <h5>Saved Songs</h5>
+                            <div id="songsList">
+                                {% for song in songs %}
+                                <div class="song-item">
+                                    <span class="song-title">{{ song.title }}</span>
+                                    {% if song.artist %}
+                                    <span class="song-artist"> - {{ song.artist }}</span>
+                                    {% endif %}
+                                    <button class="btn btn-sm btn-danger delete-btn" 
+                                            data-title="{{ song.title }}"
+                                            {% if song.artist %}
+                                            data-artist="{{ song.artist }}"
+                                            {% endif %}>Delete</button>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script>
-        // Theme toggle functionality
-        function toggleTheme() {
-            const html = document.documentElement;
-            const isDark = html.getAttribute('data-bs-theme') === 'dark';
-            const newTheme = isDark ? 'light' : 'dark';
-            
-            html.setAttribute('data-bs-theme', newTheme);
-            
-            document.getElementById('lightIcon').style.display = isDark ? 'inline' : 'none';
-            document.getElementById('darkIcon').style.display = isDark ? 'none' : 'inline';
-            
-            localStorage.setItem('theme', newTheme);
-        }
+    <!-- Lyrics View -->
+    <div id="lyricsView" style="display: none;">
+        <button id="backButton" class="btn btn-secondary mb-3" style="display: none;">
+            <i class="fas fa-arrow-left"></i> Back to Songs
+        </button>
+        <h3 id="lyricsTitle" class="mb-4"></h3>
+        <pre id="lyricsContent" class="lyrics-content"></pre>
+    </div>
 
-        // Show/hide views
-        function showMainView() {
-            document.getElementById('lyricsView').style.display = 'none';
-        }
-
-        function showLyricsView() {
-            document.getElementById('lyricsView').style.display = 'block';
-        }
-
-        document.addEventListener('DOMContentLoaded', function() {
-            // Load theme preference
-            const savedTheme = localStorage.getItem('theme') || 'light';
-            document.documentElement.setAttribute('data-bs-theme', savedTheme);
-            
-            const isDark = savedTheme === 'dark';
-            document.getElementById('lightIcon').style.display = isDark ? 'none' : 'inline';
-            document.getElementById('darkIcon').style.display = isDark ? 'inline' : 'none';
-
-            // Show main view by default
-            showMainView();
-
-            // Initial load of songs
-            fetchSongs();
-            
-            // Ensure input has focus
-            document.getElementById('songInput').focus();
-        });
-
-        async function handleSongInput() {
-            const input = document.getElementById('songInput').value.trim();
-            if (!input) return;
-
-            const response = await fetch('/process_song', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ input: input })
-            });
-
-            const result = await response.json();
-            
-            if (result.status === 'success') {
-                // Refresh the songs list
-                fetchSongs();
-                // Show the lyrics if available
-                if (result.lyrics) {
-                    displayLyrics(result.filename, result.title, result.artist, result.lyrics);
-                }
-            } else {
-                alert(result.message);
-            }
-        }
-
-        async function fetchSongs() {
-            const response = await fetch('/list_songs');
-            const data = await response.json();
-            songs = data.songs;
-            renderSongs(songs);
-        }
-
-        function filterSongs(query) {
-            query = query.toLowerCase().trim();
-            
-            // If query contains artist separator, split it
-            let songQuery = query;
-            let artistQuery = '';
-            if (query.includes('|')) {
-                [songQuery, artistQuery] = query.split('|').map(part => part.trim());
-            }
-            
-            const filteredSongs = songs.filter(song => {
-                const titleMatch = song.title.toLowerCase().includes(songQuery);
-                const artistMatch = song.artist && song.artist.toLowerCase().includes(artistQuery);
-                
-                if (artistQuery) {
-                    // If artist is specified, both title and artist should match
-                    return titleMatch && artistMatch;
-                } else {
-                    // If no artist specified, match either title or artist
-                    return titleMatch || (song.artist && song.artist.toLowerCase().includes(songQuery));
-                }
-            });
-            
-            renderSongs(filteredSongs);
-        }
-
-        function renderSongs(songs) {
-            const songList = document.getElementById('songsList');
-            songList.innerHTML = '';
-            songs.forEach(song => {
-                const button = document.createElement('button');
-                button.className = 'list-group-item list-group-item-action';
-                button.innerHTML = `
-                    <div class="d-flex w-100 justify-content-between align-items-center">
-                        <div>
-                            <div class="song-title">${song.title}</div>
-                            ${song.artist ? `<div class="song-artist">${song.artist}</div>` : ''}
-                        </div>
-                        <div class="d-flex align-items-center">
-                            <button class="btn btn-link text-danger delete-btn me-2" 
-                                    title="Delete song"
-                                    onclick="event.stopPropagation();">
-                                <i class="bi bi-trash"></i>
-                            </button>
-                            <i class="bi bi-chevron-right"></i>
-                        </div>
-                    </div>
-                `;
-                
-                // Add click handler for viewing lyrics
-                button.onclick = () => {
-                    fetch(`/get-lyrics/${encodeURIComponent(song.filename)}`)
-                        .then(response => response.json())
-                        .then(data => {
-                            if (data.error) {
-                                alert('Error loading lyrics: ' + data.error);
-                                return;
-                            }
-                            const title = data.artist ? 
-                                `${data.title} - ${data.artist}` : 
-                                data.title;
-                            document.getElementById('songTitle').textContent = title;
-                            document.getElementById('songLyrics').textContent = data.lyrics;
-                            showLyricsView();
-                        })
-                        .catch(error => {
-                            alert('Error loading lyrics: ' + error);
-                        });
-                };
-
-                // Add click handler for delete button
-                button.querySelector('.delete-btn').onclick = (e) => {
-                    e.stopPropagation();
-                    if (confirm(`Are you sure you want to delete "${song.title}"?`)) {
-                        fetch(`/delete-song/${encodeURIComponent(song.filename)}`, {
-                            method: 'DELETE'
-                        })
-                        .then(response => response.json())
-                        .then(data => {
-                            if (data.error) {
-                                alert('Error deleting song: ' + data.error);
-                                return;
-                            }
-                            // Remove the song from the songs array and re-render
-                            const index = songs.findIndex(s => s.filename === song.filename);
-                            if (index > -1) {
-                                songs.splice(index, 1);
-                                // Re-render the updated list
-                                renderSongs(songs);
-                            }
-                        })
-                        .catch(error => {
-                            alert('Error deleting song: ' + error);
-                        });
-                    }
-                };
-                
-                songList.appendChild(button);
-            });
-        }
-
-        function displayLyrics(filename, title, artist, lyrics) {
-            document.getElementById('songTitle').textContent = artist ? `${title} - ${artist}` : title;
-            document.getElementById('songLyrics').textContent = lyrics;
-            showLyricsView();
-        }
-    </script>
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
 </body>
 </html>
